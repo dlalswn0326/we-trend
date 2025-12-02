@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "vercel-build": "prisma generate && prisma db push --accept-data-loss && next build"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
