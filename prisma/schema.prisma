@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String?
+  email        String?  @unique
+  password     String?  // Hashed password for registered users
+  image        String?
+  profileImage String?  // User uploaded profile image
+  bio          String?  // User biography
+  isAnonymous  Boolean  @default(true) // Track if user is anonymous or registered
+  createdAt    DateTime @default(now())
+  
+  posts        Post[]
+  interactions Interaction[]
+  comments     Comment[]
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  content   String   // The AI summarized content or user content
+  sourceUrl String?  @unique // Original news URL
+  title     String?  // Original news title
+  tags      String?  // Comma separated tags
+  images    String?  // Comma separated image URLs
+  createdAt DateTime @default(now())
+  
+  authorId  String?
+  author    User?    @relation(fields: [authorId], references: [id])
+  
+  interactions Interaction[]
+  comments     Comment[]
+}
+
+model Interaction {
+  id        String   @id @default(cuid())
+  type      String   // LIKE, BOOKMARK
+  createdAt DateTime @default(now())
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id])
+
+  @@unique([userId, postId, type])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id])
+}
