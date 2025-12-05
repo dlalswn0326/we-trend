@@ -13,6 +13,7 @@ export async function POST(request: Request) {
             const { data: user, error } = await supabase
                 .from('User')
                 .insert({
+                    id: crypto.randomUUID(),
                     name: nickname,
                     isAnonymous: true,
                     profileImage: `https://api.dicebear.com/7.x/bottts/svg?seed=${nickname}`,

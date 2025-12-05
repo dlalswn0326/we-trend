@@ -55,6 +55,7 @@ export async function POST(request: Request) {
             const { data: newUser, error: insertError } = await supabase
                 .from('User')
                 .insert({
+                    id: crypto.randomUUID(),
                     email,
                     password: hashedPassword,
                     name: name || email.split('@')[0],
