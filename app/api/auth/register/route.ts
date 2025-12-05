@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 
 export async function POST(request: Request) {
     try {
@@ -16,9 +16,11 @@ export async function POST(request: Request) {
         const bcrypt = require('bcrypt');
 
         // Check if email already exists
-        const existingUser = await prisma.user.findUnique({
-            where: { email },
-        });
+        const { data: existingUser, error: findError } = await supabase
+            .from('User')
+            .select('*')
+            .eq('email', email)
+            .single();
 
         if (existingUser && !existingUser.isAnonymous) {
             return NextResponse.json(
@@ -34,26 +36,36 @@ export async function POST(request: Request) {
 
         if (anonymousUserId) {
             // Convert anonymous user to registered user
-            user = await prisma.user.update({
-                where: { id: anonymousUserId },
-                data: {
+            const { data: updatedUser, error: updateError } = await supabase
+                .from('User')
+                .update({
                     email,
                     password: hashedPassword,
                     name: name || undefined,
                     isAnonymous: false,
-                },
-            });
+                })
+                .eq('id', anonymousUserId)
+                .select()
+                .single();
+
+            if (updateError) throw updateError;
+            user = updatedUser;
         } else {
             // Create new registered user
-            user = await prisma.user.create({
-                data: {
+            const { data: newUser, error: insertError } = await supabase
+                .from('User')
+                .insert({
                     email,
                     password: hashedPassword,
                     name: name || email.split('@')[0],
                     isAnonymous: false,
                     profileImage: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
-                },
-            });
+                })
+                .select()
+                .single();
+
+            if (insertError) throw insertError;
+            user = newUser;
         }
 
         // Return user without password
