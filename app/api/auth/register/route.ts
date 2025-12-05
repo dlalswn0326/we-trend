@@ -16,13 +16,13 @@ export async function POST(request: Request) {
         const bcrypt = require('bcrypt');
 
         // Check if email already exists
-        const { data: existingUser, error: findError } = await supabase
+        const { data: existingUsers, error: findError } = await supabase
             .from('User')
-            .select('*')
+            .select('id, isAnonymous')
             .eq('email', email)
-            .single();
+            .limit(1);
 
-        if (existingUser && !existingUser.isAnonymous) {
+        if (existingUsers && existingUsers.length > 0 && !existingUsers[0].isAnonymous) {
             return NextResponse.json(
                 { error: 'Email already registered' },
                 { status: 400 }

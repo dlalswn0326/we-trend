@@ -38,13 +38,13 @@ export async function POST(request: Request) {
         const bcrypt = require('bcrypt');
 
         // Find user by email
-        const { data: user, error: findError } = await supabase
+        const { data: user, error } = await supabase
             .from('User')
             .select('*')
             .eq('email', email)
             .single();
 
-        if (!user || !user.password) {
+        if (error || !user || !user.password) {
             return NextResponse.json(
                 { error: 'Invalid credentials' },
                 { status: 401 }
