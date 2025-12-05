@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 
 export async function GET(request: Request) {
     try {
@@ -41,18 +41,53 @@ export async function GET(request: Request) {
             ];
         }
 
-        // Query posts with built where clause
-        const posts = await prisma.post.findMany({
-            where: whereClause,
-            include: {
-                author: true,
-                interactions: true,
-                comments: true,
-            },
-            orderBy: {
-                createdAt: 'desc',
-            },
-        });
+        // Build Supabase query
+        let query = supabase
+            .from('Post')
+            .select(`
+                id,
+                content,
+                images,
+                createdAt,
+                sourceUrl,
+                title,
+                tags,
+                authorId,
+                author:User (
+                    name,
+                    email,
+                    profileImage,
+                    image
+                ),
+                interactions:Interaction (
+                    type
+                ),
+                comments:Comment (
+                    id
+                )
+            `)
+            .order('createdAt', { ascending: false });
+
+        // Apply where conditions
+        if (filter && userId) {
+            if (filter === 'likes') {
+                query = query.eq('interactions.type', 'LIKE').eq('interactions.userId', userId);
+            } else if (filter === 'bookmarks') {
+                query = query.eq('interactions.type', 'BOOKMARK').eq('interactions.userId', userId);
+            } else if (filter === 'user') {
+                query = query.eq('authorId', userId);
+            }
+        }
+
+        if (q) {
+            query = query.or(`content.ilike.%${q}%,title.ilike.%${q}%,tags.ilike.%${q}%`);
+        }
+
+        const { data: posts, error } = await query;
+
+        if (error) {
+            throw error;
+        }
 
         // Transform data for frontend
         const formattedPosts = posts.map(post => ({
@@ -92,24 +127,40 @@ export async function POST(request: Request) {
         // For MVP, create a dummy user if no authorId provided
         let finalAuthorId = authorId;
         if (!finalAuthorId) {
-            const user = await prisma.user.upsert({
-                where: { email: 'user@example.com' },
-                update: {},
-                create: {
-                    email: 'user@example.com',
-                    name: 'Demo User',
-                },
-            });
-            finalAuthorId = user.id;
+            const { data: existingUser, error: userError } = await supabase
+                .from('User')
+                .select('id')
+                .eq('email', 'user@example.com')
+                .single();
+
+            if (!existingUser) {
+                const { data: newUser, error: createError } = await supabase
+                    .from('User')
+                    .insert({
+                        email: 'user@example.com',
+                        name: 'Demo User',
+                    })
+                    .select('id')
+                    .single();
+
+                if (createError) throw createError;
+                finalAuthorId = newUser.id;
+            } else {
+                finalAuthorId = existingUser.id;
+            }
         }
 
-        const post = await prisma.post.create({
-            data: {
+        const { data: post, error } = await supabase
+            .from('Post')
+            .insert({
                 content,
-                images: images || null, // Save images
+                images: images || null,
                 authorId: finalAuthorId,
-            },
-        });
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
 
         return NextResponse.json(post);
     } catch (error: any) {
